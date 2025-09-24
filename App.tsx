@@ -1,20 +1,40 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from "react";
+import { View, Button, StyleSheet } from "react-native";
+import { useCameraPermissions } from "expo-camera";
+
+import Driving from "./Driving/driving";
+import requestPermissions from "./accessRequest/accessRequest";
 
 export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+  const [permission, requestPermission] = useCameraPermissions();
+  const [granted, setGranted] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (permission?.granted) {
+        setGranted(true);
+      } else {
+        const result = await requestPermissions();
+        setGranted(result);
+      }
+    })();
+  }, [permission]);
+
+  if (!granted) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Button title="권한 허용하기" onPress={requestPermission} />
+      </View>
+    );
+  }
+
+  return <Driving />;
 }
 
 const styles = StyleSheet.create({
-  container: {
+  permissionContainer: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
