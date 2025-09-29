@@ -1,16 +1,26 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { PageHeaderD } from "../../MyPageScreenComponents/pageHeaderD";
 
 export default function MyPageScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>마이페이지</Text>
-      <Text>마페</Text>
-    </View>
+    <SafeAreaView style={styles.container}>
+    <PageHeaderD />
+  </SafeAreaView> 
   );
 }
 
+
+
+
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 20, fontWeight: "bold" },
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  scrollContent: {
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
 });

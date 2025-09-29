@@ -20,6 +20,9 @@ export default function DrivingReady() {
 
         if (camStatus !== "granted" || micStatus !== "granted") {
           setStatus("권한 거부됨");
+          setTimeout(() => {
+            navigation.navigate("DrivingScreen" as never);
+          }, 1000);
           return;
         }
 

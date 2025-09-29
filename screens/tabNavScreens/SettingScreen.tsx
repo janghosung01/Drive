@@ -1,16 +1,25 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-
+import { SafeAreaView } from "react-native-safe-area-context";
+import { PageHeaderD } from "../../SettingScreenComponents/pageHeaderD";
 export default function SettingScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>set</Text>
-      <Text>완벽한 운전을 시작하세요 🚗</Text>
-    </View>
+    <SafeAreaView style={styles.container}>
+    <PageHeaderD />
+  </SafeAreaView> 
   );
 }
 
+
+
+
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 20, fontWeight: "bold" },
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  scrollContent: {
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
 });
