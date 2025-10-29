@@ -18,23 +18,31 @@ export default function DrivingReady() {
         const { status: camStatus } = await Camera.requestCameraPermissionsAsync();
         const { status: micStatus } = await Audio.requestPermissionsAsync();
 
+        const cam = await Camera.requestCameraPermissionsAsync();
+        const mic = await Audio.requestPermissionsAsync();
+
+        console.log("CAM =", cam); // { status, granted, canAskAgain, expires, ... }
+        console.log("MIC =", mic);
+        console.log("Camera Permission Status:", camStatus);
+        console.log("Microphone Permission Status:", micStatus);
         if (camStatus !== "granted" || micStatus !== "granted") {
-          setStatus("권한 거부됨");
+          setStatus("권한 거부됨!!");
           setTimeout(() => {
             navigation.navigate("DrivingScreen" as never);
           }, 1000);
           return;
         }
-
-        // 소켓 연결
-        wsRef.current = new WebSocket(WS_URL);
-        wsRef.current.onopen = () => {
-          setStatus("연결 성공! 주행 화면으로 이동합니다...");
-          setTimeout(() => {
-            navigation.navigate("Driving" as never);
-          }, 1000);
-        };
-        wsRef.current.onerror = () => setStatus("서버 연결 실패");
+        //임시 주행 화면으로 이동
+        navigation.navigate("Driving" as never);
+        // // 소켓 연결
+        // wsRef.current = new WebSocket(WS_URL);
+        // wsRef.current.onopen = () => {
+        //   setStatus("연결 성공! 주행 화면으로 이동합니다...");
+        //   setTimeout(() => {
+        //     navigation.navigate("Driving" as never);
+        //   }, 1000);
+        // };
+        // wsRef.current.onerror = () => setStatus("서버 연결 실패");
       } catch (e) {
         setStatus("에러 발생");
       }

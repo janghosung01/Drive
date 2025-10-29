@@ -1,9 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { PageHeaderD } from "../../RecordScreenComponents/pageHeaderD";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
+
+// 너가 쓰던 헤더 컴포넌트
+import { PageHeaderD } from "../../RecordScreenComponents/pageHeaderD";
+// 상세 컴포넌트 (아래 자식 파일)
+import { RecordDetails } from "../../RecordScreenComponents/RecordDetail";
 
 // 샘플 데이터
 const sampleData = [
@@ -16,56 +20,47 @@ const sampleData = [
   { id: "7", date: "2024-05-13 11:45", duration: "358분", distance: "331.3km", events: 7, status: "주의" },
 ];
 
-// 로컬 타임존 기준 YYYY-MM-DD 문자열 만들기
+// 유틸
 function toLocalYmd(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-// "2024-01-15 14:30" → "2024-01-15"만 추출 (샘플 데이터용)
 function ymdFromSample(dateStr: string) {
   return dateStr.split(" ")[0];
 }
-// "2024-01-15 14:30" → Date 파싱(간단)
 function parseSampleDate(dateStr: string) {
-  // iOS 호환 위해 yyyy-mm-ddTHH:MM로 변환 후 파싱
   const [d, t] = dateStr.split(" ");
   return new Date(`${d}T${t}:00`);
 }
-// "45분" → 45
 function toMin(s: string) {
   return parseInt(s.replace(/\D/g, "") || "0", 10);
 }
 
 export default function RecordScreen() {
   const [filter, setFilter] = useState<"recent" | "time" | "events">("recent");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc"); // 기본: 내림차순(최근/많은 우선)
-
-  // 달력 관련
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // 정렬 토글 시 라벨
+  // 상세 오버레이용 선택 id (prop으로 전달)
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const sortLabel = useMemo(() => {
     if (filter === "recent") return sortDir === "desc" ? "최근 순" : "오래된 순";
     if (filter === "time") return sortDir === "desc" ? "많은 순" : "적은 순";
-    return sortDir === "desc" ? "많은 순" : "적은 순"; // events
+    return sortDir === "desc" ? "많은 순" : "적은 순";
   }, [filter, sortDir]);
 
   const toggleSortDir = () => setSortDir((p) => (p === "asc" ? "desc" : "asc"));
 
-  // 정렬/필터링 적용된 리스트
   const filteredData = useMemo(() => {
     let arr = [...sampleData];
-
-    // 날짜 필터(선택되었을 때만)
     if (selectedDate) {
       const target = toLocalYmd(selectedDate);
       arr = arr.filter((it) => ymdFromSample(it.date) === target);
     }
-
-    // 정렬
     if (filter === "recent") {
       arr.sort((a, b) => {
         const da = parseSampleDate(a.date).getTime();
@@ -84,27 +79,34 @@ export default function RecordScreen() {
     return arr;
   }, [filter, sortDir, selectedDate]);
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.recordItem}>
-      <Ionicons name="car-sport-outline" size={28} color="#3478F6" />
-      <View style={styles.recordInfo}>
-        <Text style={styles.recordDate}>{item.date}</Text>
-        <Text style={styles.recordDetails}>주행시간 : {item.duration}</Text>
-        <Text style={styles.recordEvents}>{item.events}개 이벤트</Text>
-      </View>
-      <Text
-        style={[
-          styles.recordStatus,
-          item.status === "주의"
-            ? { color: "orange" }
-            : item.status.includes("안전")
-            ? { color: "green" }
-            : { color: "#333" },
-        ]}
+  const renderItem = useCallback(
+    ({ item }: any) => (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => setSelectedId(item.id)} // ← 여기서 id를 선택
+        style={styles.recordItem}
       >
-        {item.status}
-      </Text>
-    </View>
+        <Ionicons name="car-sport-outline" size={28} color="#3478F6" />
+        <View style={styles.recordInfo}>
+          <Text style={styles.recordDate}>{item.date}</Text>
+          <Text style={styles.recordDetails}>주행시간 : {item.duration}</Text>
+          <Text style={styles.recordEvents}>{item.events}개 이벤트</Text>
+        </View>
+        <Text
+          style={[
+            styles.recordStatus,
+            item.status === "주의"
+              ? { color: "orange" }
+              : item.status.includes("안전")
+              ? { color: "green" }
+              : { color: "#333" },
+          ]}
+        >
+          {item.status}
+        </Text>
+      </TouchableOpacity>
+    ),
+    []
   );
 
   const showPicker = () => setPickerVisible(true);
@@ -119,10 +121,9 @@ export default function RecordScreen() {
     <SafeAreaView style={styles.container}>
       <PageHeaderD />
 
-      {/* 필터 + 정렬방향 + 날짜 선택 바 */}
+      {/* 필터/정렬/날짜 */}
       <View style={styles.toolbar}>
         <View style={styles.rowBetween}>
-          {/* 필터 버튼 */}
           <View style={styles.filterContainer}>
             {(["recent", "time", "events"] as const).map((type) => (
               <TouchableOpacity
@@ -137,7 +138,6 @@ export default function RecordScreen() {
             ))}
           </View>
 
-          {/* 정렬 방향 토글 */}
           <TouchableOpacity style={styles.sortBtn} onPress={toggleSortDir}>
             <Ionicons
               name={sortDir === "desc" ? "arrow-down-circle-outline" : "arrow-up-circle-outline"}
@@ -148,7 +148,6 @@ export default function RecordScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 날짜 선택 */}
         <View style={styles.dateRow}>
           <TouchableOpacity style={styles.dateBtn} onPress={showPicker}>
             <Ionicons name="calendar-clear-outline" size={18} color="#3478F6" />
@@ -165,7 +164,7 @@ export default function RecordScreen() {
         </View>
       </View>
 
-      {/* 주간 요약 카드 */}
+      {/* 요약 */}
       <View style={styles.summaryCard}>
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryValue, { color: "#3478F6" }]}>12회</Text>
@@ -202,6 +201,14 @@ export default function RecordScreen() {
         onCancel={hidePicker}
         locale="ko-KR"
       />
+
+      {/* 상세 오버레이 (선택 시 표시) */}
+      {selectedId && (
+        <RecordDetails
+          id={selectedId}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }
