@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import DrivingScreen from "../screens/tabNavScreens/DrivingScreen";
 import DrivingReady from "../Driving/DrivingReady";
 import Driving from "../Driving/Driving";
+import Record from "../Driving/Record";
 const Stack = createNativeStackNavigator();
 
 export default function DrivingStack() {
@@ -12,6 +13,7 @@ export default function DrivingStack() {
       <Stack.Screen name="DrivingScreen" component={DrivingScreen} />
       <Stack.Screen name="DrivingReady" component={DrivingReady} />
       <Stack.Screen name="Driving" component={Driving} />
+      <Stack.Screen name="Record" component={Record} />
     </Stack.Navigator>
   );
 }
