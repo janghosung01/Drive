@@ -1,9 +1,12 @@
+// screens/tabNavScreens/MyPageScreen.jsx
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { PageHeaderD } from "../../MyPageScreenComponents/pageHeaderD";
-
+import {useAuth} from "../../auth/AuthContext"
 export default function MyPageScreen() {
+  const { logout } = useAuth(); // ★ 컨텍스트에서 logout 가져오기
+
   return (
     <SafeAreaView style={styles.container}>
       <PageHeaderD />
@@ -79,32 +82,32 @@ export default function MyPageScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>기타</Text>
 
-          <TouchableOpacity style={styles.itemRow}>
+          <TouchableOpacity style={styles.itemRow} onPress={() => { /* TODO: 회원정보 수정 이동 */ }}>
             <Text style={styles.itemLeft}>회원정보 수정</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.itemDivider} />
 
-          <TouchableOpacity style={styles.itemRow}>
+          <TouchableOpacity style={styles.itemRow} onPress={() => { /* TODO: 비밀번호 변경 이동 */ }}>
             <Text style={styles.itemLeft}>비밀번호 변경</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.itemDivider} />
 
-          <TouchableOpacity style={styles.itemRow}>
+          <TouchableOpacity style={styles.itemRow} onPress={() => { /* TODO: 알림 설정 이동 */ }}>
             <Text style={styles.itemLeft}>알림 설정</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.itemDivider} />
 
-          <TouchableOpacity style={styles.itemRow}>
+          <TouchableOpacity style={styles.itemRow} onPress={() => { /* TODO: 계정 삭제 플로우 */ }}>
             <Text style={[styles.itemLeft, { color: "#DC2626" }]}>계정 삭제</Text>
             <Text style={[styles.chevron, { color: "#DC2626" }]}>›</Text>
           </TouchableOpacity>
         </View>
 
-        {/* 로그아웃 버튼(하단 여백 포함) */}
-        <TouchableOpacity style={styles.logoutBtn}>
+        {/* 로그아웃 버튼 */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
           <Text style={styles.logoutText}>로그아웃</Text>
         </TouchableOpacity>
 
@@ -119,7 +122,7 @@ const R = 12;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F2F4F7" },
   scroll: { flex: 1 },
-  content: { padding: 16 }, // ScrollView 내부 여백
+  content: { padding: 16 },
 
   /* 카드 공통 */
   card: {
