@@ -1,17 +1,84 @@
+// LoginScreen.jsx
 import React, { useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
+
+const SERVER_BASE = "http://15.165.244.204:8080";
+const BLUE = "#2357EB";
 
 export default function LoginScreen({ onLoginSuccess, onGoSignup }) {
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [focus, setFocus] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (id === "user" && password === "1234") onLoginSuccess?.();
-    else alert("아이디나 비밀번호가 올바르지 않습니다.");
+  const handleLogin = async () => {
+    if (!id.trim() || !password.trim()) {
+      Alert.alert("로그인 실패", "아이디와 비밀번호를 모두 입력하세요.");
+      return;
+    }
+
+    setLoading(true);
+
+    // 10초 타임아웃
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const res = await fetch(`${SERVER_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          loginId: id.trim(),
+          password: password,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+    const raw = await res.clone().text();
+    console.log("로그인 응답 raw:", raw);
+    console.log("로그인 응답 status:", res.status);
+
+
+      // 2xx 외엔 실패로 간주
+      if (raw.includes('"code":404')||raw.includes('"code":400')||raw.includes('"code":401')) {
+        let msg = "아이디 또는 비밀번호가 올바르지 않습니다.";
+        try {
+          const errJson = await res.json();
+          if (errJson?.message) msg = errJson.message;
+        } catch (_) {}
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      console.log("로그인 응답 데이터:", data);
+      // 필요 시 토큰/유저정보 저장
+      // 예: await AsyncStorage.setItem("accessToken", data.accessToken);
+      
+      onLoginSuccess?.(data); // 컨텍스트의 login() 호출 또는 상위 콜백
+    } catch (e) {
+      const aborted = e?.name === "AbortError";
+      Alert.alert(
+        "로그인 실패",
+        aborted ? "네트워크 지연으로 로그인에 실패했습니다. 다시 시도해 주세요." : String(e.message || e)
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -24,6 +91,7 @@ export default function LoginScreen({ onLoginSuccess, onGoSignup }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* 상단 아이콘/타이틀 */}
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
             <Text style={styles.carEmoji}>🚗</Text>
@@ -32,6 +100,7 @@ export default function LoginScreen({ onLoginSuccess, onGoSignup }) {
           <Text style={styles.subtitle}>안전하고 완벽한 드라이빙의 시작</Text>
         </View>
 
+        {/* 입력 폼 */}
         <View style={styles.form}>
           <Text style={styles.label}>
             아이디 <Text style={styles.required}>*</Text>
@@ -45,6 +114,7 @@ export default function LoginScreen({ onLoginSuccess, onGoSignup }) {
             onFocus={() => setFocus("id")}
             onBlur={() => setFocus(null)}
             autoCapitalize="none"
+            editable={!loading}
           />
 
           <Text style={[styles.label, { marginTop: 18 }]}>
@@ -59,13 +129,22 @@ export default function LoginScreen({ onLoginSuccess, onGoSignup }) {
             onFocus={() => setFocus("pw")}
             onBlur={() => setFocus(null)}
             secureTextEntry
+            editable={!loading}
           />
 
-          <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginBtnText}>로그인</Text>
+          <TouchableOpacity
+            style={[styles.loginBtn, loading && { opacity: 0.7 }]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.loginBtnText}>로그인</Text>
+            )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.signUpBtn} onPress={onGoSignup}>
+          <TouchableOpacity style={styles.signUpBtn} onPress={onGoSignup} disabled={loading}>
             <Text style={styles.signUpBtnText}>회원가입</Text>
           </TouchableOpacity>
         </View>
@@ -76,8 +155,6 @@ export default function LoginScreen({ onLoginSuccess, onGoSignup }) {
   );
 }
 
-const BLUE = "#2357EB";
-
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
@@ -87,21 +164,28 @@ const styles = StyleSheet.create({
   },
   hero: { alignItems: "center", marginBottom: 28 },
   heroIcon: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: "#E9F0FF", alignItems: "center", justifyContent: "center",
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#E9F0FF",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 16,
   },
   carEmoji: { fontSize: 36 },
   title: { fontSize: 28, fontWeight: "800", color: "#0F172A" },
   subtitle: { marginTop: 6, fontSize: 14, color: "#64748B" },
-
   form: { marginTop: 14 },
   label: { fontSize: 14, color: "#374151", marginBottom: 8, fontWeight: "600" },
   required: { color: "#EF4444" },
-
   input: {
-    width: "100%", height: 52, backgroundColor: "#FFFFFF",
-    borderRadius: 12, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 14,
+    width: "100%",
+    height: 52,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 14,
   },
   inputFocused: {
     borderColor: "#2F62F1",
@@ -111,19 +195,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-
   loginBtn: {
-    marginTop: 24, height: 56, backgroundColor: BLUE,
-    borderRadius: 14, alignItems: "center", justifyContent: "center",
+    marginTop: 24,
+    height: 56,
+    backgroundColor: BLUE,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   loginBtnText: { color: "#FFF", fontSize: 18, fontWeight: "700" },
-
   signUpBtn: {
-    marginTop: 12, height: 56, backgroundColor: "#FFFFFF",
-    borderRadius: 14, alignItems: "center", justifyContent: "center",
-    borderWidth: 1.5, borderColor: BLUE,
+    marginTop: 12,
+    height: 56,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: BLUE,
   },
   signUpBtnText: { color: BLUE, fontSize: 16, fontWeight: "700" },
-
   footer: { textAlign: "center", color: "#8A93A3", marginTop: 36 },
 });
