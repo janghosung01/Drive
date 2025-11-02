@@ -13,6 +13,7 @@ import {
   Alert,
 } from "react-native";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 const SERVER_BASE = "http://15.165.244.204:8080";
 const BLUE = "#2357EB";
 
@@ -22,65 +23,68 @@ export default function LoginScreen({ onLoginSuccess, onGoSignup }) {
   const [focus, setFocus] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!id.trim() || !password.trim()) {
-      Alert.alert("로그인 실패", "아이디와 비밀번호를 모두 입력하세요.");
-      return;
-    }
+const handleLogin = async () => {
+  if (!id.trim() || !password.trim()) {
+    Alert.alert("로그인 실패", "아이디와 비밀번호를 모두 입력하세요.");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    // 10초 타임아웃
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
 
-    try {
-      const res = await fetch(`${SERVER_BASE}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          loginId: id.trim(),
-          password: password,
-        }),
-        signal: controller.signal,
-      });
+  try {
+    const res = await fetch(`${SERVER_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        loginId: id.trim(),
+        password: password,
+      }),
+      signal: controller.signal,
+    });
 
-      clearTimeout(timer);
+    clearTimeout(timer);
     const raw = await res.clone().text();
     console.log("로그인 응답 raw:", raw);
     console.log("로그인 응답 status:", res.status);
 
-
-      // 2xx 외엔 실패로 간주
-      if (raw.includes('"code":404')||raw.includes('"code":400')||raw.includes('"code":401')) {
-        let msg = "아이디 또는 비밀번호가 올바르지 않습니다.";
-        try {
-          const errJson = await res.json();
-          if (errJson?.message) msg = errJson.message;
-        } catch (_) {}
-        throw new Error(msg);
-      }
-
-      const data = await res.json();
-      console.log("로그인 응답 데이터:", data);
-      // 필요 시 토큰/유저정보 저장
-      // 예: await AsyncStorage.setItem("accessToken", data.accessToken);
-      
-      onLoginSuccess?.(data); // 컨텍스트의 login() 호출 또는 상위 콜백
-    } catch (e) {
-      const aborted = e?.name === "AbortError";
-      Alert.alert(
-        "로그인 실패",
-        aborted ? "네트워크 지연으로 로그인에 실패했습니다. 다시 시도해 주세요." : String(e.message || e)
-      );
-    } finally {
-      setLoading(false);
+    if (raw.includes('"code":404') || raw.includes('"code":400') || raw.includes('"code":401')) {
+      let msg = "아이디 또는 비밀번호가 올바르지 않습니다.";
+      try {
+        const errJson = await res.json();
+        if (errJson?.message) msg = errJson.message;
+      } catch (_) {}
+      throw new Error(msg);
     }
-  };
 
+    const data = await res.json();
+    console.log("로그인 응답 데이터:", data);
+
+    // ✅ 토큰 저장
+    const token = data?.data?.accessToken;
+    if (token) {
+      await AsyncStorage.setItem("accessToken", token);
+      console.log("✅ accessToken 저장 완료:", token);
+    } else {
+      console.warn("⚠️ accessToken이 응답에 없습니다.");
+    }
+
+    onLoginSuccess?.(data);
+  } catch (e) {
+    const aborted = e?.name === "AbortError";
+    Alert.alert(
+      "로그인 실패",
+      aborted ? "네트워크 지연으로 로그인에 실패했습니다. 다시 시도해 주세요." : String(e.message || e)
+    );
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#F5F7FB" }}
