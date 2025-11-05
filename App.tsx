@@ -4,8 +4,9 @@ import { StatusBar } from "react-native";
 
 import RootNavigation from "./navigation/rootNavigation";
 import LoginScreen from "./Login/LoginScreen";
-import Signup from "./Login/Signup"; // ✅ 회원가입 화면
+import Signup from "./Login/Signup";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { WebSocketProvider } from "./Driving/context/WebSocketContext";
 
 function Gate() {
   const { isLoggedIn, login } = useAuth();
@@ -15,13 +16,11 @@ function Gate() {
 
   return authRoute === "login" ? (
     <LoginScreen
-      onLoginSuccess={login}            // ✅ 로그인 성공 시 메인으로
+      onLoginSuccess={login}
       onGoSignup={() => setAuthRoute("signup")}
     />
   ) : (
-    <Signup
-      onGoLogin={() => setAuthRoute("login")} // ← 상단 뒤로가기 등에서 로그인 화면으로
-    />
+    <Signup onGoLogin={() => setAuthRoute("login")} />
   );
 }
 
@@ -29,9 +28,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" />
-      <AuthProvider>
-        <Gate />
-      </AuthProvider>
+      <WebSocketProvider>
+        <AuthProvider>
+          <Gate />
+        </AuthProvider>
+      </WebSocketProvider>
     </SafeAreaProvider>
   );
 }
