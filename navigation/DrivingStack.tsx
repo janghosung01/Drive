@@ -3,7 +3,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import DrivingScreen from "../screens/tabNavScreens/DrivingScreen";
 import DrivingReady from "../Driving/DrivingReady";
-import Driving from "../Driving/Driving";
+import Driving from "../Driving/driving";
 import Record from "../Driving/Record";
 const Stack = createNativeStackNavigator();
 
