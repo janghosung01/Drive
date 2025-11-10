@@ -1,26 +1,33 @@
+// driving.tsx
 import React, { useRef, useState, useEffect } from "react";
-import { View, Button, StyleSheet, Text, Alert } from "react-native";
-import { Camera, CameraView } from "expo-camera"; // v17: CameraView + startRecording API
+import { View, Button, StyleSheet, Text, Alert, Modal, ActivityIndicator } from "react-native";
+import { Camera, CameraView } from "expo-camera";
 import { Audio } from "expo-av";
+import * as Speech from "expo-speech"; // ★ 추가: TTS
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
 import { useWebSocket } from "./context/WebSocketContext";
-import {
-  fileUriToArrayBuffer,
-  zipSingleFileIfAvailable,
-} from "../utils/wsHelpers";
+import { fileUriToArrayBuffer, zipSingleFileIfAvailable } from "../utils/wsHelpers";
 
 const HOST = "15.165.244.204:8080";
 
+function speakWithLogs(text: string, opts: Speech.SpeechOptions = {}) {
+  console.log("[TTS] request:", text);
+  Speech.speak(text, {
+    language: "ko-KR",
+    pitch: 1.0,
+    rate: 1.0,
+    onStart: () => console.log("[TTS] onStart"),
+    onStopped: () => console.log("[TTS] onStopped"),
+    onDone: () => console.log("[TTS] onDone"),
+    onError: (e) => console.warn("[TTS] onError:", e),
+    ...opts,
+  });
+}
 export default function Driving() {
+  const navigation = useNavigation<any>();
   const cameraRef = useRef<CameraView | null>(null);
-  const {
-    connect,
-    close,
-    sendJson,
-    sendBinary,
-    onceOpen,
-    ref: wsRef,
-  } = useWebSocket();
+  const { connect, close, sendJson, sendBinary, onceOpen, ref: wsRef } = useWebSocket();
 
   const [jwt, setJwt] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -30,6 +37,9 @@ export default function Driving() {
   const [camPerm, setCamPerm] = useState(false);
   const [audPerm, setAudPerm] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+
+  const [stopping, setStopping] = useState(false);
+  const navigateAfterStopRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -42,7 +52,6 @@ export default function Driving() {
     })();
   }, []);
 
-  // 권한: expo-camera 쪽 API로 둘 다 요청 (v17 권장)
   useEffect(() => {
     (async () => {
       try {
@@ -50,7 +59,6 @@ export default function Driving() {
         setCamPerm(cs === "granted");
         const { status: ms } = await Camera.requestMicrophonePermissionsAsync();
         setAudPerm(ms === "granted");
-
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
@@ -78,32 +86,23 @@ export default function Driving() {
     };
   }, [recording]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    return () => {
       if (recording) stopRecording();
-    },
-    [recording]
-  );
+    };
+  }, [recording]);
 
   const formatTime = (n: number) =>
-    `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(
-      2,
-      "0"
-    )}`;
+    `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
 
-  // ✅ CameraView 전용: 세그먼트 하나를 Promise로 감싸서 받기
+  // 단일 세그먼트(2초) 녹화
   const recordOneSegment = () =>
     new Promise<string>((resolve, reject) => {
       if (!cameraRef.current) return reject(new Error("camera not ready"));
-
-      // 기탁 변경 -> Promise 관련으로 recordAsync 사용 (startRecording 대신)
       cameraRef.current
-        .recordAsync({
-          maxDuration: 4, // 4초 세그먼트
-        })
+        .recordAsync({ maxDuration: 2 })
         .then((video) => {
-          // video.uri 반환
-          if (video && video.uri) {
+          if (video?.uri) {
             console.log("[REC] recordAsync completed, uri:", video.uri);
             resolve(video.uri);
           } else {
@@ -126,17 +125,23 @@ export default function Driving() {
 
   const startRecording = async () => {
     if (recording) return;
-    if (!camPerm || !audPerm)
-      return Alert.alert("권한 필요", "카메라/마이크 권한을 허용해주세요.");
-    if (!cameraReady || !cameraRef.current)
-      return Alert.alert("카메라 준비 중", "잠시 후 다시 시도해주세요.");
+    if (!camPerm || !audPerm) return Alert.alert("권한 필요", "카메라/마이크 권한을 허용해주세요.");
+    if (!cameraReady || !cameraRef.current) return Alert.alert("카메라 준비 중", "잠시 후 다시 시도해주세요.");
     if (!jwt) return Alert.alert("인증 오류", "로그인 토큰이 없습니다.");
 
     let startedSent = false;
+    navigateAfterStopRef.current = false;
+    setStopping(false);
+
     try {
-      const url = `ws://${HOST}/ws/driving?token=${encodeURIComponent(
-        `Bearer ${jwt}`
-      )}`;
+      // ★ 안내 멘트: 운행 시작 시 1회 재생
+      Speech.speak("운행을 시작합니다. 안내를 시작합니다.", {
+        language: "ko-KR",
+        pitch: 1.0,
+        rate: 1.0,
+      });
+
+      const url = `ws://${HOST}/ws/driving?token=${encodeURIComponent(`Bearer ${jwt}`)}`;
       await connect(url);
       await onceOpen();
       sendJson({ type: "START" });
@@ -146,31 +151,20 @@ export default function Driving() {
       setElapsedTime(0);
       drivingLoopRef.current = true;
 
-      // 짧은 워밍업 (안드로이드에서 중요)
-      await new Promise((r) => setTimeout(r, 250));
+      // 워밍업 약간
+      await new Promise((r) => setTimeout(r, 150));
+
+      // --- 파이프라인 루프 ---
+      let nextPromise: Promise<string> | null = null;
 
       while (drivingLoopRef.current) {
-        console.log("[REC] start loop");
+        const uri = nextPromise ? await nextPromise : await recordOneSegment();
+        nextPromise = drivingLoopRef.current ? recordOneSegment() : null;
 
-        // ⬇️ 여기서 세그먼트 하나 생성 (4초)
-        const uri = await recordOneSegment(); // ← recordAsync 완료까지 대기
-        console.log("[REC] finished segment:", uri);
-
-        if (!uri) {
-          console.log("[REC] no uri, break");
-          break;
-        }
-
-        // 압축 및 전송
-        const zipped = await zipSingleFileIfAvailable(uri);
-        const buf = await fileUriToArrayBuffer(zipped);
+        const path = await zipSingleFileIfAvailable(uri); // 현재는 원본 그대로 반환
+        const buf = await fileUriToArrayBuffer(path);
         console.log("[REC] sendBinary size:", (buf as ArrayBuffer).byteLength);
         sendBinary(buf);
-
-        // ✅ 다음 세그먼트 시작 전 짧은 대기 (안드로이드 안정성)
-        await new Promise((r) => setTimeout(r, 100));
-
-        // 루프 플래그가 내려가면 다음 세그먼트 시작 안 함
       }
     } catch (e: any) {
       const msg = String(e?.message || e);
@@ -181,24 +175,64 @@ export default function Driving() {
         Alert.alert("녹화 실패", "녹화 중 오류가 발생했습니다.");
       }
     } finally {
-      // 안전 정리
+      // 안내 멘트 중지(혹시 남아있다면)
+      try { Speech.stop(); } catch {}
+
+      // 정리
       drivingLoopRef.current = false;
-      stopNativeRecordingIfAny(); // 혹시 진행 중인 녹화가 있으면 종료
+      stopNativeRecordingIfAny();
       setRecording(false);
+
+      const socketAtFinally = wsRef.current as any;
+
       try {
-        if (startedSent && wsRef.current?.readyState === WebSocket.OPEN)
+        if (startedSent && socketAtFinally?.readyState === WebSocket.OPEN) {
           sendJson({ type: "END" });
+        }
       } catch {}
+
       try {
         close();
       } catch {}
+
+      // 소켓 close 대기 (최대 600ms)
+      const waitWsClosed = async () => {
+        const ws = socketAtFinally;
+        if (!ws || ws.readyState === WebSocket.CLOSED) return;
+        if (typeof ws.addEventListener === "function") {
+          await new Promise<void>((resolve) => {
+            const onClose = () => {
+              try { ws.removeEventListener("close", onClose); } catch {}
+              resolve();
+            };
+            ws.addEventListener("close", onClose);
+            if (ws.readyState === WebSocket.CLOSED) onClose();
+            setTimeout(() => resolve(), 600);
+          });
+        } else {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      };
+      await waitWsClosed();
+
+      if (navigateAfterStopRef.current) {
+        navigateAfterStopRef.current = false;
+        setStopping(false);
+        navigation.getParent()?.navigate("기록실");
+      } else {
+        setStopping(false);
+      }
     }
   };
 
-  // ✅ Graceful stop: 네이티브 stop만 호출하고, 현재 세그먼트가 onRecordingFinished로 끝나도록
   const stopRecording = () => {
-    drivingLoopRef.current = false; // 다음 세그먼트 시작 막기
-    stopNativeRecordingIfAny(); // 진행 중인 세그먼트는 종료 콜백으로 마무리
+    if (!recording) return;
+    // 안내 멘트가 재생 중이면 멈춤
+    try { Speech.stop(); } catch {}
+    setStopping(true);
+    navigateAfterStopRef.current = true;
+    drivingLoopRef.current = false;
+    stopNativeRecordingIfAny();
     setRecording(false);
     // END/close는 finally에서 처리
   };
@@ -209,21 +243,37 @@ export default function Driving() {
         ref={cameraRef}
         style={{ flex: 1 }}
         facing="back"
-        // 기탁 변경 -> 비디오 모드랑 오디오 녹음 활성화 및 화질 명시
         mode="video"
         mute={false}
         videoQuality="480p"
         onCameraReady={() => setCameraReady(true)}
       />
+
       <View style={styles.timeContainer}>
         <Text style={styles.timeText}>{formatTime(elapsedTime)}</Text>
       </View>
+
       <View style={styles.buttonContainer}>
         <Button
           title={recording ? "녹화 중지 및 종료" : "녹화 시작"}
           onPress={recording ? stopRecording : startRecording}
+          disabled={stopping}
         />
       </View>
+      <Button
+  title="TTS 테스트"
+  onPress={() => speakWithLogs("테스트 음성입니다. 잘 들리시나요?")}
+/>
+
+      <Modal visible={stopping} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ActivityIndicator size="large" />
+            <Text style={styles.modalText}>녹화 중지 중…</Text>
+            <Text style={styles.modalSub}>데이터 정리 및 업로드를 마무리하는 중입니다.</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -238,4 +288,20 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   timeText: { fontSize: 30, fontWeight: "bold", color: "white" },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCard: {
+    width: 260,
+    borderRadius: 14,
+    backgroundColor: "white",
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  modalText: { marginTop: 12, fontSize: 16, fontWeight: "600" },
+  modalSub: { marginTop: 6, fontSize: 12, color: "#666", textAlign: "center" },
 });

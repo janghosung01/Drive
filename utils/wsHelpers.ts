@@ -1,24 +1,15 @@
 // utils/wsHelpers.ts
-// legacy로 변경 (ios라서 변경했는데 나중에 찬양이 안드로이드 폰에서 확인해봐야함)
 import * as FileSystem from "expo-file-system/legacy";
 
-// 네이티브 모듈(react-native-zip-archive)은 Expo Go에서 바로 동작하지 않습니다.
-// dev client 또는 실제 빌드가 필요하므로, 로드 실패 시엔 자동으로 원본 파일로 fallback 합니다.
-let RNZipArchive: {
-  zip: (src: string, dest: string) => Promise<string>;
-} | null = null;
+// (ZIP 미사용 설정) 필요 시 실제 네이티브 모듈 연결해서 복구 가능
+let RNZipArchive: { zip: (src: string, dest: string) => Promise<string> } | null = null;
 try {
-  // 런타임에만 require -> 타입은 d.ts로 보완
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   RNZipArchive = require("react-native-zip-archive");
 } catch {
   RNZipArchive = null;
 }
 
-/** base64 → ArrayBuffer */
 export function b64ToArrayBuffer(b64: string): ArrayBuffer {
-  // RN/Expo 환경에서 atob가 없을 수 있으므로 base-64 패키지를 권장하지만,
-  // expo-file-system에서 이미 base64로 읽어오므로 여기서는 안전하게 변환만 수행.
   const binary = global.atob
     ? global.atob(b64 ?? "")
     : Buffer.from(b64 ?? "", "base64").toString("binary");
@@ -28,29 +19,22 @@ export function b64ToArrayBuffer(b64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-/** file:// URI → ArrayBuffer (Expo - iOS/Android 호환) */
 export async function fileUriToArrayBuffer(uri: string): Promise<ArrayBuffer> {
   try {
     const normalized = decodeURI(uri);
-
     const response = await fetch(normalized);
     const blob = await response.blob();
-
     return new Promise<ArrayBuffer>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        if (reader.result instanceof ArrayBuffer) {
-          resolve(reader.result);
-        } else {
-          reject(new Error("Failed to read blob as ArrayBuffer"));
-        }
+        if (reader.result instanceof ArrayBuffer) resolve(reader.result);
+        else reject(new Error("Failed to read blob as ArrayBuffer"));
       };
       reader.onerror = () => reject(reader.error);
       reader.readAsArrayBuffer(blob);
     });
   } catch (e) {
     console.warn("fetch 방식 실패, 재시도:", e);
-
     try {
       const normalized = decodeURI(uri);
       const b64 = await FileSystem.readAsStringAsync(normalized, {
@@ -64,17 +48,17 @@ export async function fileUriToArrayBuffer(uri: string): Promise<ArrayBuffer> {
   }
 }
 
-/** (선택) 단일 파일을 zip으로 감싸기. 모듈 미존재/실패 시 원본 경로 반환 */
-export async function zipSingleFileIfAvailable(
-  fileUri: string
-): Promise<string> {
-  if (!RNZipArchive) return fileUri;
-  const target = fileUri.replace(/\.mp4$/i, "") + ".zip";
-  try {
-    await RNZipArchive.zip(fileUri, target);
-    return target;
-  } catch (e) {
-    console.warn("zip 실패, 원본 사용:", e);
-    return fileUri;
-  }
+// ★ ZIP 생략: 항상 원본 파일 경로 반환
+export async function zipSingleFileIfAvailable(fileUri: string): Promise<string> {
+  return fileUri;
+  // 필요 시:
+  // if (!RNZipArchive) return fileUri;
+  // const target = fileUri.replace(/\.mp4$/i, "") + ".zip";
+  // try {
+  //   await RNZipArchive.zip(fileUri, target);
+  //   return target;
+  // } catch (e) {
+  //   console.warn("zip 실패, 원본 사용:", e);
+  //   return fileUri;
+  // }
 }
