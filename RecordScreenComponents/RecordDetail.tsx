@@ -82,7 +82,7 @@ const EventItem = ({
     <View style={styles.eventMetaRow}>
       <Ionicons name="time-outline" size={14} color="#6B7280" />
       <Text style={styles.dot}>총 주행 시간 :</Text>
-      <Text style={styles.eventMetaText}>{time}</Text>      
+      <Text style={styles.eventMetaText}>{time}</Text>
     </View>
 
     <Pressable onPress={onPress} style={styles.playChip}>
@@ -93,7 +93,7 @@ const EventItem = ({
 );
 
 type Props = {
-  id: string;           // 부모에서 넘겨주는 주행 id
+  id: string; // 부모에서 넘겨주는 주행 id
   onClose?: () => void; // 닫기(선택)
 };
 
@@ -103,107 +103,120 @@ export const RecordDetails = ({ id, onClose }: Props) => {
 
   return (
     <View style={styles.overlay}>
-      <SafeAreaView style={styles.sheet} edges={["top", "bottom"]}>
-        {/* 상단 바 (제목 + 닫기) */}
-        <View style={styles.topBar}>
-          <Text style={styles.topTitle}>주행 상세</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={22} color="#111827" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* 헤더 카드 (id 출력 포함) */}
-          <View style={styles.headerCard}>
-            <View>
-              <Text style={styles.dateText}>{data.date}</Text>
-              <Text style={styles.subText}>{data.startTime}</Text>
-
-            </View>
-            <View style={styles.durationBox}>
-              <Text style={styles.durationBig}>{data.drivingMinutes}분</Text>
-              <Text style={styles.durationSub}>주행 시간</Text>
-            </View>
+      {/* SafeAreaView는 상단/좌/우만, 배경은 안쪽 sheet에서 처리 */}
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+        <View style={styles.sheet}>
+          {/* 상단 바 (제목 + 닫기) */}
+          <View style={styles.topBar}>
+            <Text style={styles.topTitle}>주행 상세</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={22} color="#111827" />
+            </TouchableOpacity>
           </View>
 
-          {/* 주행 기록 영상 */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>운전 기록 영상</Text>
-            <View style={styles.videoCard}>
-              <Image source={{ uri: data.video.thumbnail }} style={styles.videoImage} />
-              <View style={styles.videoOverlay}>
-                <TouchableOpacity
-                  onPress={() => {
-                    // TODO: 비디오 플레이어로 이동/재생
-                  }}
-                  style={styles.playButton}
-                >
-                  <Ionicons name="play" size={28} color="#111827" />
-                </TouchableOpacity>
-
-                <View style={styles.videoMetaLeft}>
-                  <Text style={styles.videoMetaBadge}>{data.video.duration}</Text>
-                </View>
-
-                <View style={styles.videoMetaRight}>
-                  <Text style={styles.videoQuality}>{data.video.quality}</Text>
-                </View>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 헤더 카드 (id 출력 포함) */}
+            <View style={styles.headerCard}>
+              <View>
+                <Text style={styles.dateText}>{data.date}</Text>
+                <Text style={styles.subText}>{data.startTime}</Text>
+              </View>
+              <View style={styles.durationBox}>
+                <Text style={styles.durationBig}>{data.drivingMinutes}분</Text>
+                <Text style={styles.durationSub}>주행 시간</Text>
               </View>
             </View>
 
-            <View style={styles.videoFootRow}>
-              <Text style={styles.footMuted}>용량: {data.video.size}</Text>
+            {/* 주행 기록 영상 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>운전 기록 영상</Text>
+              <View style={styles.videoCard}>
+                <Image
+                  source={{ uri: data.video.thumbnail }}
+                  style={styles.videoImage}
+                />
+                <View style={styles.videoOverlay}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      // TODO: 비디오 플레이어로 이동/재생
+                    }}
+                    style={styles.playButton}
+                  >
+                    <Ionicons name="play" size={28} color="#111827" />
+                  </TouchableOpacity>
+
+                  <View style={styles.videoMetaLeft}>
+                    <Text style={styles.videoMetaBadge}>
+                      {data.video.duration}
+                    </Text>
+                  </View>
+
+                  <View style={styles.videoMetaRight}>
+                    <Text style={styles.videoQuality}>{data.video.quality}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.videoFootRow}>
+                <Text style={styles.footMuted}>용량: {data.video.size}</Text>
+              </View>
             </View>
-          </View>
 
-          {/* 이벤트 리스트 */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>주행 이벤트</Text>
-              <Text style={styles.sectionCount}>{data.events.length}개</Text>
+            {/* 이벤트 리스트 */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>주행 이벤트</Text>
+                <Text style={styles.sectionCount}>{data.events.length}개</Text>
+              </View>
+
+              {data.events.map((ev) => (
+                <EventItem
+                  key={ev.id}
+                  title={ev.title}
+                  time={ev.time}
+                  clipAt={ev.clipAt}
+                  color={ev.color}
+                  icon={ev.icon}
+                  onPress={() => {
+                    // TODO: 특정 시점부터 영상 재생
+                  }}
+                />
+              ))}
             </View>
 
-            {data.events.map((ev) => (
-              <EventItem
-                key={ev.id}
-                title={ev.title}
-                time={ev.time}
-                clipAt={ev.clipAt}
-                color={ev.color}
-                icon={ev.icon}
-                onPress={() => {
-                  // TODO: 특정 시점부터 영상 재생
-                }}
-              />
-            ))}
+            {/* 하단 여백 (스크롤 여유) */}
+            <View style={{ height: 16 }} />
+          </ScrollView>
+
+          {/* 하단 고정 버튼들 */}
+          <View style={styles.bottomBar}>
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: "#9CA3AF" }]}
+              onPress={onClose}
+            >
+              <Ionicons name="close" size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>닫기</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                { backgroundColor: "#2563EB", marginTop: 10 },
+              ]}
+              onPress={() => {
+                // TODO: 전체 주행 영상 보기
+              }}
+            >
+              <Ionicons name="play" size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>전체 주행 영상 보기</Text>
+            </TouchableOpacity>
           </View>
-
-          {/* 하단 여백 */}
-          <View style={{ height: 16 }} />
-        </ScrollView>
-
-        {/* 하단 고정 버튼들 */}
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: "#9CA3AF" }]}
-            onPress={onClose}
-          >
-            <Ionicons name="close" size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>닫기</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: "#2563EB", marginTop: 10 }]}
-            onPress={() => {
-              // TODO: 전체 주행 영상 보기
-            }}
-          >
-            <Ionicons name="play" size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>전체 주행 영상 보기</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </View>
@@ -215,16 +228,17 @@ const styles = StyleSheet.create({
   /** 전체 화면 덮개 (뒤 배경 어둡게) */
   overlay: {
     position: "absolute",
-    left: 0, right: 0, top: 0, bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)", // 살짝 더 진하게
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
 
-  /** 시트 = 실제 모달 컨테이너 (전체 화면 차지) */
+  /** 시트 = 실제 모달 컨테이너 */
   sheet: {
-    flex: 1,                // ← 전체 높이
-    backgroundColor: "#F3F4F6",
-    borderTopLeftRadius: 0, // ← 라운드 제거
-    borderTopRightRadius: 0,
+    flex: 1,
+    backgroundColor: "#F2F4F7", // 안쪽 배경
   },
 
   topBar: {
@@ -241,7 +255,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  scrollContent: { padding: 16 },
+  // ★ 하단 버튼이 가리지 않도록 paddingBottom 추가
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 80,
+  },
 
   /* 헤더 카드 */
   headerCard: {
@@ -265,8 +283,17 @@ const styles = StyleSheet.create({
 
   /* 공통 섹션 */
   section: { marginTop: 18 },
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#111827", marginBottom: 12 },
-  sectionHeaderRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   sectionCount: { marginLeft: "auto", color: "#6B7280", fontWeight: "700" },
 
   /* 비디오 카드 */
@@ -289,15 +316,19 @@ const styles = StyleSheet.create({
   playButton: {
     backgroundColor: "#fff",
     borderRadius: 999,
-    width: 56, height: 56,
-    alignItems: "center", justifyContent: "center",
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
   },
   videoMetaLeft: { position: "absolute", left: 12, bottom: 12 },
   videoMetaRight: {
     position: "absolute",
-    right: 12, bottom: 12,
+    right: 12,
+    bottom: 12,
     backgroundColor: "#111827",
-    paddingHorizontal: 8, paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
   },
   videoMetaBadge: {
@@ -327,8 +358,11 @@ const styles = StyleSheet.create({
   },
   eventRow: { flexDirection: "row", alignItems: "center" },
   eventBadge: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: "center", justifyContent: "center",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 10,
   },
   eventTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: "#111827" },
@@ -338,20 +372,28 @@ const styles = StyleSheet.create({
   playChip: {
     alignSelf: "flex-start",
     marginTop: 12,
-    flexDirection: "row", alignItems: "center",
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     backgroundColor: "#E5E7EB",
-    paddingHorizontal: 10, paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderRadius: 10,
   },
   playChipText: { fontWeight: "700", color: "#111827", fontSize: 13 },
 
   /* 하단 버튼 영역 */
-  bottomBar: { padding: 16, backgroundColor: "transparent" },
+  bottomBar: {
+    padding: 16,
+    backgroundColor: "transparent",
+  },
   primaryBtn: {
-    height: 52, borderRadius: 12,
-    alignItems: "center", justifyContent: "center",
-    flexDirection: "row", gap: 8,
+    height: 52,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
 });

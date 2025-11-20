@@ -7,9 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  SafeAreaView,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   useNavigation,
   useIsFocused,
@@ -23,6 +21,8 @@ import { QuickAccess } from '../../HomeComponents/QuickAccess';
 // ------------------- 공통 설정 & 함수 -------------------
 
 const SERVER_BASE = 'http://15.165.244.204:8080';
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /**
  * 이번 주 월요일 00:00:00.000 ~ 일요일 23:59:59.999 의 ISO 문자열을 계산
@@ -128,7 +128,7 @@ const fetchRecentRecord = async () => {
 const WeeklyStats = () => {
   const [weeklyData, setWeeklyData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const isFocused = useIsFocused(); // ★ Home 탭에 포커스될 때마다 true
+  const isFocused = useIsFocused(); // Home 탭 포커스 시 true
 
   useEffect(() => {
     if (!isFocused) return;
@@ -167,12 +167,11 @@ const WeeklyStats = () => {
     );
   }
 
-  const totalSeconds = weeklyData.totalSeconds ?? 0;
-  const totalHours = (totalSeconds / 3600).toFixed(1);
-  const drivingCount = weeklyData.dailySeconds
-    ? weeklyData.dailySeconds.length
-    : 0;
-  const warningCount = weeklyData.totalWarnings ?? 0;
+  // 🔹 백엔드 응답 필드에 맞게 매핑
+  const totalSeconds = weeklyData.totalSeconds ?? 0;            // 총 주행 시간(초)
+  const totalHours = (totalSeconds / 3600).toFixed(1);          // 시 단위로 변환
+  const drivingCount = weeklyData.totalDrivingCount ?? 0;       // 주행 횟수
+  const warningCount = weeklyData.totalEventCount ?? 0;         // 경고 알림 수
 
   return (
     <View style={statsStyles.container}>
@@ -221,7 +220,7 @@ const RecentRecords = () => {
   const navigation = useNavigation();
   const [recentList, setRecentList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const isFocused = useIsFocused(); // ★ Home 탭 포커스
+  const isFocused = useIsFocused(); // Home 탭 포커스
 
   useEffect(() => {
     if (!isFocused) return;
@@ -262,22 +261,32 @@ const RecentRecords = () => {
         </Text>
       )}
 
-      {/* TODO: 나중에 recentList 기반으로 실제 시간/상태 뿌려주면 됨 */}
+      {/* ★ API 데이터 기반 렌더링 */}
       {!loading &&
-        ['오늘 오후 2:30', '오늘 오후 3:30'].map((time, index) => (
-          <View key={index} style={recordStyles.recordItem}>
-            <Ionicons name="car-sport-outline" size={24} color="#8E8E93" />
-            <View style={recordStyles.textContainer}>
-              <Text style={recordStyles.recordTime}>{time}</Text>
-              <Text style={recordStyles.recordDetails}>35분 주행 • 안전</Text>
+        recentList.map((item) => {
+          const dateStr = `${item.startYear}-${pad2(
+            item.startMonth,
+          )}-${pad2(item.startDay)} ${item.startTime}`;
+          const timeLabel = `${item.drivingTime}분 주행`;
+          const scoreLabel = item.drivingScoreMessage ?? ' - ';
+
+          return (
+            <View key={item.drivingId} style={recordStyles.recordItem}>
+              <Ionicons name="car-sport-outline" size={24} color="#8E8E93" />
+              <View style={recordStyles.textContainer}>
+                <Text style={recordStyles.recordTime}>{dateStr}</Text>
+                <Text style={recordStyles.recordDetails}>
+                  {timeLabel} • {scoreLabel}
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward-outline"
+                size={20}
+                color="#8E8E93"
+              />
             </View>
-            <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color="#8E8E93"
-            />
-          </View>
-        ))}
+          );
+        })}
     </View>
   );
 };
@@ -314,7 +323,6 @@ const recordStyles = StyleSheet.create({
 
 export default function HomeScreen() {
   return (
-    // bottom safe area 제거하고, 실제 배경은 안쪽 View에서 처리
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         <PageHeader />
