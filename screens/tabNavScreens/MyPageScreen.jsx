@@ -238,7 +238,7 @@ export default function MyPageScreen() {
               </TouchableOpacity>
               <View style={styles.itemDivider} />
 
-              
+            
               <TouchableOpacity
                 style={styles.itemRow}
                 onPress={() => {

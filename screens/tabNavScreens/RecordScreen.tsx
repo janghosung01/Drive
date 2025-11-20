@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
@@ -11,7 +11,7 @@ import { RecordDetails } from "../../RecordScreenComponents/RecordDetail";
 
 const SERVER_BASE = "http://15.165.244.204:8080";
 
-// --- 타입 정의 (백엔드 DTO와 매칭) ---
+// --- 타입 정의 ---
 interface HistoryRecord {
   id: number;         // drivingId
   date: string;       // "2024-01-15 14:30"
@@ -39,8 +39,9 @@ export default function RecordScreen() {
   const isFocused = useIsFocused();
 
   // --- 상태 관리 ---
-  // 필터: recent(최근순), time(운전시간순), events(이벤트순)
-  const [filter, setFilter] = useState<"recent" | "time" | "events">("recent");
+  // ★ [수정] 필터에서 'events' 제거 (recent: 최근순, time: 운전시간순)
+  const [filter, setFilter] = useState<"recent" | "time">("recent");
+  
   // 정렬방향: desc(내림차순-기본), asc(오름차순)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   
@@ -73,14 +74,13 @@ export default function RecordScreen() {
     try {
       const token = await AsyncStorage.getItem("accessToken");
       if (!token) {
-        // Alert.alert("오류", "로그인이 필요합니다.");
         setLoading(false);
         return;
       }
 
       // 쿼리 파라미터 구성
       const params = new URLSearchParams();
-      params.append("sortBy", filter); // recent, time, events
+      params.append("sortBy", filter); // recent, time
       params.append("sortDir", sortDir); // asc, desc
       params.append("page", pageToFetch.toString());
       params.append("size", PAGE_SIZE.toString());
@@ -89,7 +89,7 @@ export default function RecordScreen() {
         params.append("date", toLocalYmd(selectedDate));
       }
 
-      console.log(`[API] 기록 조회 요청: ${SERVER_BASE}/api/history/list?${params.toString()}`);
+      // console.log(`[API] 기록 조회 요청: ${SERVER_BASE}/api/history/list?${params.toString()}`);
 
       const res = await fetch(`${SERVER_BASE}/api/history/list?${params.toString()}`, {
         method: "GET",
@@ -106,7 +106,6 @@ export default function RecordScreen() {
       }
 
       const json = await res.json();
-      // console.log("[API] 응답:", JSON.stringify(json, null, 2));
 
       if (json.success) {
         const newRecords = json.data.records; // 리스트
@@ -120,7 +119,7 @@ export default function RecordScreen() {
           setRecords((prev) => [...prev, ...newRecords]);
         }
 
-        // 다음 페이지가 있는지 확인 (받아온 개수가 요청 사이즈보다 작으면 마지막 페이지)
+        // 다음 페이지 확인
         setIsLastPage(newRecords.length < PAGE_SIZE);
         setPage(pageToFetch);
       }
@@ -134,7 +133,6 @@ export default function RecordScreen() {
   // --- Effect: 필터/정렬/날짜 변경 시 초기화 및 재조회 ---
   useEffect(() => {
     if (isFocused) {
-      // 필터가 바뀌면 0페이지부터 새로 조회
       fetchHistory(0, true);
     }
   }, [filter, sortDir, selectedDate, isFocused]);
@@ -155,13 +153,11 @@ export default function RecordScreen() {
     setPickerVisible(false);
   };
 
-  // --- 정렬 버튼 텍스트 ---
+  // --- ★ [수정] 정렬 버튼 텍스트 (이벤트 관련 제거) ---
   const sortLabel = useMemo(() => {
-    const dirText = sortDir === "desc" ? "(내림차순)" : "(오름차순)";
     if (filter === "recent") return sortDir === "desc" ? "최근 순" : "오래된 순";
     if (filter === "time") return sortDir === "desc" ? "시간 많은 순" : "시간 적은 순";
-    if (filter === "events") return sortDir === "desc" ? "이벤트 많은 순" : "이벤트 적은 순";
-    return dirText;
+    return sortDir === "desc" ? "내림차순" : "오름차순";
   }, [filter, sortDir]);
 
   // --- 렌더링 ---
@@ -184,7 +180,7 @@ export default function RecordScreen() {
             ? { color: "orange" }
             : item.status.includes("안전")
             ? { color: "green" }
-            : { color: "#E53E3E" }, // 위험 등
+            : { color: "#E53E3E" },
         ]}
       >
         {item.status}
@@ -201,14 +197,15 @@ export default function RecordScreen() {
         <View style={styles.toolbar}>
           <View style={styles.rowBetween}>
             <View style={styles.filterContainer}>
-              {(["recent", "time", "events"] as const).map((type) => (
+              {/* ★ [수정] events 제거하고 recent, time만 표시 */}
+              {(["recent", "time"] as const).map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[styles.filterButton, filter === type && styles.filterButtonActive]}
                   onPress={() => setFilter(type)}
                 >
                   <Text style={[styles.filterText, filter === type && styles.filterTextActive]}>
-                    {type === "recent" ? "최근" : type === "time" ? "운전시간" : "이벤트"}
+                    {type === "recent" ? "최근" : "운전시간"}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -240,7 +237,7 @@ export default function RecordScreen() {
           </View>
         </View>
 
-        {/* 2. 요약 카드 (API 데이터 연동) */}
+        {/* 2. 요약 카드 */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryValue, { color: "#3478F6" }]}>{summary.totalDrivingCount}회</Text>
@@ -256,13 +253,13 @@ export default function RecordScreen() {
           </View>
         </View>
 
-        {/* 3. 리스트 (무한 스크롤) */}
+        {/* 3. 리스트 */}
         <FlatList
           data={records}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           onEndReached={onEndReached}
-          onEndReachedThreshold={0.5} // 하단 50% 남았을 때 로딩
+          onEndReachedThreshold={0.5}
           ListEmptyComponent={
             !loading ? (
               <Text style={styles.emptyText}>
@@ -361,9 +358,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  summaryItem: { alignItems: "center" },
+  summaryItem: { alignItems: 'center', flex: 1 }, // flex: 1 추가하여 균등 분배
   summaryValue: { fontSize: 18, fontWeight: "bold" },
-  summaryLabel: { fontSize: 12, color: "#666" },
+  summaryLabel: { fontSize: 12, color: "#666", marginTop: 2 },
 
   recordItem: {
     flexDirection: "row",
