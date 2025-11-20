@@ -28,9 +28,7 @@ export default function RootNavigation() {
               iconName = "car";
             } else if (route.name === "기록실") {
               iconName = "time";
-            } else if (route.name === "설정") {
-              iconName = "settings";
-            } else if (route.name === "마이페이지") {
+            }  else if (route.name === "마이페이지") {
               iconName = "person";
             }
             return <Ionicons name={iconName} size={size} color={color} />;
@@ -42,7 +40,6 @@ export default function RootNavigation() {
         <Tab.Screen name="홈" component={HomeScreen} />
         <Tab.Screen name="주행" component={DrivingStack} />
         <Tab.Screen name="기록실" component={RecordScreen} />
-        <Tab.Screen name="설정" component={SettingScreen} />
         <Tab.Screen name="마이페이지" component={MyPageScreen} />
       </Tab.Navigator>
     </NavigationContainer>
