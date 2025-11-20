@@ -238,17 +238,7 @@ export default function MyPageScreen() {
               </TouchableOpacity>
               <View style={styles.itemDivider} />
 
-              <TouchableOpacity
-                style={styles.itemRow}
-                onPress={() => {
-                  /* TODO: 알림 설정 이동 */
-                }}
-              >
-                <Text style={styles.itemLeft}>알림 설정</Text>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
-              <View style={styles.itemDivider} />
-
+              
               <TouchableOpacity
                 style={styles.itemRow}
                 onPress={() => {

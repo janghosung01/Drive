@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity, // ★ 터치 처리를 위해 추가
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,19 +19,18 @@ import { PageHeader } from '../../HomeComponents/PageHeader';
 import { TitleBanner } from '../../HomeComponents/TitleBanner';
 import { QuickAccess } from '../../HomeComponents/QuickAccess';
 
+// ★ RecordDetails 컴포넌트 임포트 (경로 확인)
+import { RecordDetails } from '../../RecordScreenComponents/RecordDetail';
+
 // ------------------- 공통 설정 & 함수 -------------------
 
 const SERVER_BASE = 'http://15.165.244.204:8080';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/**
- * 이번 주 월요일 00:00:00.000 ~ 일요일 23:59:59.999 의 ISO 문자열을 계산
- */
 const getThisWeekRange = () => {
   const now = new Date();
-
-  const day = now.getDay(); // 일요일=0, 월요일=1 ...
+  const day = now.getDay();
   const diffToMonday = (day + 6) % 7;
 
   const monday = new Date(now);
@@ -47,40 +47,27 @@ const getThisWeekRange = () => {
   };
 };
 
-/**
- * GET /api/home/weekly-status?from=...&to=...
- */
 const fetchWeeklyStats = async () => {
   try {
     const { from, to } = getThisWeekRange();
     const params = new URLSearchParams({ from, to }).toString();
 
     const accessToken = await AsyncStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.warn('⚠️ accessToken 이 없습니다. 비로그인 상태일 수 있습니다.');
-    }
+    if (!accessToken) return null;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
     };
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
 
     const response = await fetch(
       `${SERVER_BASE}/api/home/weekly-status?${params}`,
-      {
-        method: 'GET',
-        headers,
-      },
+      { method: 'GET', headers },
     );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
 
     const data = await response.json();
-    console.log('📌 weekly-status 응답:', JSON.stringify(data, null, 2));
     return data;
   } catch (error) {
     console.error('Error fetching weekly stats:', error);
@@ -88,34 +75,24 @@ const fetchWeeklyStats = async () => {
   }
 };
 
-/**
- * GET /api/home/recentRecord
- */
 const fetchRecentRecord = async () => {
   try {
     const accessToken = await AsyncStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.warn('⚠️ accessToken 이 없습니다. 비로그인 상태일 수 있습니다.');
-    }
+    if (!accessToken) return null;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
     };
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
 
     const response = await fetch(`${SERVER_BASE}/api/home/recentRecord`, {
       method: 'GET',
       headers,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
 
     const json = await response.json();
-    console.log('📌 recentRecord 응답:', JSON.stringify(json, null, 2));
     return json;
   } catch (error) {
     console.error('Error fetching recent record:', error);
@@ -128,11 +105,10 @@ const fetchRecentRecord = async () => {
 const WeeklyStats = () => {
   const [weeklyData, setWeeklyData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const isFocused = useIsFocused(); // Home 탭 포커스 시 true
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     if (!isFocused) return;
-
     setLoading(true);
     (async () => {
       const res = await fetchWeeklyStats();
@@ -167,11 +143,10 @@ const WeeklyStats = () => {
     );
   }
 
-  // 🔹 백엔드 응답 필드에 맞게 매핑
-  const totalSeconds = weeklyData.totalSeconds ?? 0;            // 총 주행 시간(초)
-  const totalHours = (totalSeconds / 3600).toFixed(1);          // 시 단위로 변환
-  const drivingCount = weeklyData.totalDrivingCount ?? 0;       // 주행 횟수
-  const warningCount = weeklyData.totalEventCount ?? 0;         // 경고 알림 수
+  const totalSeconds = weeklyData.totalSeconds ?? 0;
+  const totalHours = (totalSeconds / 3600).toFixed(1);
+  const drivingCount = weeklyData.totalDrivingCount ?? 0;
+  const warningCount = weeklyData.totalEventCount ?? 0;
 
   return (
     <View style={statsStyles.container}>
@@ -216,15 +191,15 @@ const statsStyles = StyleSheet.create({
   label: { fontSize: 12, color: '#8E8E93' },
 });
 
-const RecentRecords = () => {
+// ★ [수정] onRecordPress props 추가 (클릭 시 ID 전달용)
+const RecentRecords = ({ onRecordPress }: { onRecordPress: (id: string) => void }) => {
   const navigation = useNavigation();
   const [recentList, setRecentList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const isFocused = useIsFocused(); // Home 탭 포커스
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     if (!isFocused) return;
-
     setLoading(true);
     (async () => {
       const res = await fetchRecentRecord();
@@ -261,7 +236,6 @@ const RecentRecords = () => {
         </Text>
       )}
 
-      {/* ★ API 데이터 기반 렌더링 */}
       {!loading &&
         recentList.map((item) => {
           const dateStr = `${item.startYear}-${pad2(
@@ -271,7 +245,12 @@ const RecentRecords = () => {
           const scoreLabel = item.drivingScoreMessage ?? ' - ';
 
           return (
-            <View key={item.drivingId} style={recordStyles.recordItem}>
+            // ★ [수정] View 대신 TouchableOpacity 사용 & onPress 연결
+            <TouchableOpacity 
+              key={item.drivingId} 
+              style={recordStyles.recordItem}
+              onPress={() => onRecordPress(String(item.drivingId))} // ID를 문자열로 변환해 전달
+            >
               <Ionicons name="car-sport-outline" size={24} color="#8E8E93" />
               <View style={recordStyles.textContainer}>
                 <Text style={recordStyles.recordTime}>{dateStr}</Text>
@@ -284,7 +263,7 @@ const RecentRecords = () => {
                 size={20}
                 color="#8E8E93"
               />
-            </View>
+            </TouchableOpacity>
           );
         })}
     </View>
@@ -322,6 +301,9 @@ const recordStyles = StyleSheet.create({
 // ------------------- HomeScreen -------------------
 
 export default function HomeScreen() {
+  // ★ [추가] 선택된 기록 ID 상태 관리
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
@@ -330,8 +312,17 @@ export default function HomeScreen() {
           <TitleBanner />
           <QuickAccess />
           <WeeklyStats />
-          <RecentRecords />
+          {/* ★ [수정] onRecordPress prop 전달 */}
+          <RecentRecords onRecordPress={(id) => setSelectedId(id)} />
         </ScrollView>
+
+        {/* ★ [추가] 상세 모달 (선택된 ID가 있으면 표시) */}
+        {selectedId && (
+          <RecordDetails
+            id={selectedId}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -344,6 +335,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 20,
-    paddingBottom: 80, // 탭바에 안 가리게 여유
+    paddingBottom: 80, 
   },
 });
