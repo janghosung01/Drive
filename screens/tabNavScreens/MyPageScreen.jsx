@@ -48,25 +48,35 @@ export const fetchMyProfile = async () => {
   }
 };
 
+// 누적 시간(초 기준 가정)을 "X시간 Y분" 형태로 포맷
+const formatTotalDrivingTime = (seconds) => {
+  if (!seconds || seconds <= 0) return "0분";
+
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+
+  if (h > 0) {
+    return `${h}시간 ${m}분`;
+  }
+  return `${m}분`;
+};
+
 export default function MyPageScreen() {
   const { logout } = useAuth();
 
-  // 프로필 상태
   const [profile, setProfile] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
 
-  // 마이페이지 진입 시 한 번 프로필 불러오기
   React.useEffect(() => {
     (async () => {
       const res = await fetchMyProfile();
       if (res?.success) {
-        setProfile(res.data); // { id, loginId, nickname, gender, birthdate, createdAt, ... }
+        setProfile(res.data); // { id, loginId, nickname, gender, birthDate, createdAt, safeScore, totalDrivingCount, totalDrivingTime, ... }
       }
       setLoading(false);
     })();
   }, []);
 
-  // 프로필 변경 로그 확인용
   React.useEffect(() => {
     if (profile) {
       console.log("✅ profile state:", profile);
@@ -81,165 +91,188 @@ export default function MyPageScreen() {
       ? "여성"
       : profile?.gender || "-";
 
-  // 가입일 yyyy-mm-dd 로 자르기
-  const joinedAt = profile?.createdAt
-    ? profile.createdAt.slice(0, 10)
-    : "-";
+  // 가입일 yyyy-mm-dd
+  const joinedAt = profile?.createdAt ? profile.createdAt.slice(0, 10) : "-";
+
+  // 안전 점수(0~100 가정)
+  const safeScore = typeof profile?.safeScore === "number" ? profile.safeScore : 0;
+  const clampedSafeScore = Math.min(Math.max(safeScore, 0), 100);
+
+  // 총 주행 / 누적 시간
+  const totalDrivingCount =
+    typeof profile?.totalDrivingCount === "number"
+      ? profile.totalDrivingCount
+      : 0;
+  const totalDrivingTimeSeconds =
+    typeof profile?.totalDrivingTime === "number"
+      ? profile.totalDrivingTime
+      : 0;
+  const totalDrivingTimeLabel = formatTotalDrivingTime(totalDrivingTimeSeconds);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <PageHeaderD />
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+      <View style={styles.container}>
+        <PageHeaderD />
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        bounces
-      >
-        {/* 로딩 중 카드 */}
-        {loading && (
-          <View style={[styles.card, { alignItems: "center" }]}>
-            <ActivityIndicator />
-            <Text style={{ marginTop: 8, fontSize: 12, color: "#6B7280" }}>
-              프로필을 불러오는 중입니다...
-            </Text>
-          </View>
-        )}
-
-        {/* 프로필 카드 */}
-        {!loading && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>마이페이지</Text>
-
-            <View style={styles.profileBox}>
-              <View style={styles.avatar} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>
-                  {profile?.nickname || "안전운전자"}
-                </Text>
-                <Text style={styles.subMuted}>
-                  @{profile?.loginId || "safedriver123"}
-                </Text>
-              </View>
-            </View>
-
-            {/* 이 부분은 아직 더미 데이터 */}
-            <View style={styles.statRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statMain}>127회</Text>
-                <Text style={styles.subMuted}>총 주행</Text>
-              </View>
-              <View style={styles.dividerY} />
-              <View style={styles.statItem}>
-                <Text style={styles.statMain}>45.2시간</Text>
-                <Text style={styles.subMuted}>누적 시간</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* 안전 점수 카드 (추후 API 연동 가능) */}
-        {!loading && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>안전 점수</Text>
-            <View style={styles.progressRow}>
-              <Text style={styles.progressLabel}>위험</Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: "85%" }]} />
-              </View>
-              <Text style={styles.progressLabel}>안전</Text>
-            </View>
-            <Text style={styles.scoreText}>85 / 100</Text>
-          </View>
-        )}
-
-        {/* 회원 정보 카드 */}
-        {!loading && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>회원 정보</Text>
-
-            <View style={styles.itemRow}>
-              <Text style={styles.itemLeft}>성별</Text>
-              <Text style={styles.itemRight}>{genderLabel}</Text>
-            </View>
-            <View style={styles.itemDivider} />
-
-            <View style={styles.itemRow}>
-              <Text style={styles.itemLeft}>생년월일</Text>
-              <Text style={styles.itemRight}>
-                {profile?.birthDate || "-"}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, { paddingBottom: 80 }]}
+          showsVerticalScrollIndicator={false}
+          bounces
+        >
+          {/* 로딩 중 카드 */}
+          {loading && (
+            <View style={[styles.card, { alignItems: "center" }]}>
+              <ActivityIndicator />
+              <Text style={{ marginTop: 8, fontSize: 12, color: "#6B7280" }}>
+                프로필을 불러오는 중입니다...
               </Text>
             </View>
-            <View style={styles.itemDivider} />
+          )}
 
-            <View style={styles.itemRow}>
-              <Text style={styles.itemLeft}>가입일</Text>
-              <Text style={styles.itemRight}>{joinedAt}</Text>
+          {/* 프로필 카드 */}
+          {!loading && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>마이페이지</Text>
+
+              <View style={styles.profileBox}>
+                <View style={styles.avatar} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>
+                    {profile?.nickname || "안전운전자"}
+                  </Text>
+                  <Text style={styles.subMuted}>
+                    @{profile?.loginId || "safedriver123"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* ✅ 여기부터 실제 API 값 사용 */}
+              <View style={styles.statRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statMain}>{totalDrivingCount}회</Text>
+                  <Text style={styles.subMuted}>총 주행</Text>
+                </View>
+                <View style={styles.dividerY} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statMain}>{totalDrivingTimeLabel}</Text>
+                  <Text style={styles.subMuted}>누적 시간</Text>
+                </View>
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* 기타/계정 관리 카드 */}
-        {!loading && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>기타</Text>
-
-            <TouchableOpacity
-              style={styles.itemRow}
-              onPress={() => {
-                /* TODO: 회원정보 수정 이동 */
-              }}
-            >
-              <Text style={styles.itemLeft}>회원정보 수정</Text>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-            <View style={styles.itemDivider} />
-
-            <TouchableOpacity
-              style={styles.itemRow}
-              onPress={() => {
-                /* TODO: 비밀번호 변경 이동 */
-              }}
-            >
-              <Text style={styles.itemLeft}>비밀번호 변경</Text>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-            <View style={styles.itemDivider} />
-
-            <TouchableOpacity
-              style={styles.itemRow}
-              onPress={() => {
-                /* TODO: 알림 설정 이동 */
-              }}
-            >
-              <Text style={styles.itemLeft}>알림 설정</Text>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-            <View style={styles.itemDivider} />
-
-            <TouchableOpacity
-              style={styles.itemRow}
-              onPress={() => {
-                /* TODO: 계정 삭제 플로우 */
-              }}
-            >
-              <Text style={[styles.itemLeft, { color: "#DC2626" }]}>
-                계정 삭제
+          {/* 안전 점수 카드 */}
+          {!loading && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>안전 점수</Text>
+              <View style={styles.progressRow}>
+                <Text style={styles.progressLabel}>위험</Text>
+                <View style={styles.progressBar}>
+                  {/* ✅ safeScore로 너비 조절 */}
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${clampedSafeScore}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.progressLabel}>안전</Text>
+              </View>
+              <Text style={styles.scoreText}>
+                {clampedSafeScore} / 100
               </Text>
-              <Text style={[styles.chevron, { color: "#DC2626" }]}>›</Text>
+            </View>
+          )}
+
+          {/* 회원 정보 카드 */}
+          {!loading && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>회원 정보</Text>
+
+              <View style={styles.itemRow}>
+                <Text style={styles.itemLeft}>성별</Text>
+                <Text style={styles.itemRight}>{genderLabel}</Text>
+              </View>
+              <View style={styles.itemDivider} />
+
+              <View style={styles.itemRow}>
+                <Text style={styles.itemLeft}>생년월일</Text>
+                <Text style={styles.itemRight}>
+                  {profile?.birthDate || "-"}
+                </Text>
+              </View>
+              <View style={styles.itemDivider} />
+
+              <View style={styles.itemRow}>
+                <Text style={styles.itemLeft}>가입일</Text>
+                <Text style={styles.itemRight}>{joinedAt}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* 기타/계정 관리 카드 */}
+          {!loading && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>기타</Text>
+
+              <TouchableOpacity
+                style={styles.itemRow}
+                onPress={() => {
+                  /* TODO: 회원정보 수정 이동 */
+                }}
+              >
+                <Text style={styles.itemLeft}>회원정보 수정</Text>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+              <View style={styles.itemDivider} />
+
+              <TouchableOpacity
+                style={styles.itemRow}
+                onPress={() => {
+                  /* TODO: 비밀번호 변경 이동 */
+                }}
+              >
+                <Text style={styles.itemLeft}>비밀번호 변경</Text>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+              <View style={styles.itemDivider} />
+
+              <TouchableOpacity
+                style={styles.itemRow}
+                onPress={() => {
+                  /* TODO: 알림 설정 이동 */
+                }}
+              >
+                <Text style={styles.itemLeft}>알림 설정</Text>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+              <View style={styles.itemDivider} />
+
+              <TouchableOpacity
+                style={styles.itemRow}
+                onPress={() => {
+                  /* TODO: 계정 삭제 플로우 */
+                }}
+              >
+                <Text style={[styles.itemLeft, { color: "#DC2626" }]}>
+                  계정 삭제
+                </Text>
+                <Text style={[styles.chevron, { color: "#DC2626" }]}>›</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* 로그아웃 버튼 */}
+          {!loading && (
+            <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+              <Text style={styles.logoutText}>로그아웃</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
 
-        {/* 로그아웃 버튼 */}
-        {!loading && (
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-            <Text style={styles.logoutText}>로그아웃</Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={{ height: 16 }} />
-      </ScrollView>
+          <View style={{ height: 16 }} />
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -281,6 +314,7 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 18, fontWeight: "600", color: "#111827" },
   subMuted: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+
   statRow: {
     flexDirection: "row",
     backgroundColor: "#F8FAFC",

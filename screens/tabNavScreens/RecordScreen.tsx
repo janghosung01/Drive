@@ -4,9 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 
-// 너가 쓰던 헤더 컴포넌트
 import { PageHeaderD } from "../../RecordScreenComponents/pageHeaderD";
-// 상세 컴포넌트 (아래 자식 파일)
 import { RecordDetails } from "../../RecordScreenComponents/RecordDetail";
 
 // 샘플 데이터
@@ -44,7 +42,7 @@ export default function RecordScreen() {
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // 상세 오버레이용 선택 id (prop으로 전달)
+  // 상세 오버레이용 선택 id
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const sortLabel = useMemo(() => {
@@ -83,7 +81,7 @@ export default function RecordScreen() {
     ({ item }: any) => (
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => setSelectedId(item.id)} // ← 여기서 id를 선택
+        onPress={() => setSelectedId(item.id)}
         style={styles.recordItem}
       >
         <Ionicons name="car-sport-outline" size={28} color="#3478F6" />
@@ -118,97 +116,101 @@ export default function RecordScreen() {
   const clearDate = () => setSelectedDate(null);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <PageHeaderD />
+    // ★ bottom safe area 제거 (top, left, right만)
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+      {/* 실제 회색 배경은 안쪽 View에서 */}
+      <View style={styles.container}>
+        <PageHeaderD />
 
-      {/* 필터/정렬/날짜 */}
-      <View style={styles.toolbar}>
-        <View style={styles.rowBetween}>
-          <View style={styles.filterContainer}>
-            {(["recent", "time", "events"] as const).map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[styles.filterButton, filter === type && styles.filterButtonActive]}
-                onPress={() => setFilter(type)}
-              >
-                <Text style={[styles.filterText, filter === type && styles.filterTextActive]}>
-                  {type === "recent" ? "최근" : type === "time" ? "운전시간" : "이벤트"}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* 필터/정렬/날짜 */}
+        <View style={styles.toolbar}>
+          <View style={styles.rowBetween}>
+            <View style={styles.filterContainer}>
+              {(["recent", "time", "events"] as const).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.filterButton, filter === type && styles.filterButtonActive]}
+                  onPress={() => setFilter(type)}
+                >
+                  <Text style={[styles.filterText, filter === type && styles.filterTextActive]}>
+                    {type === "recent" ? "최근" : type === "time" ? "운전시간" : "이벤트"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.sortBtn} onPress={toggleSortDir}>
+              <Ionicons
+                name={sortDir === "desc" ? "arrow-down-circle-outline" : "arrow-up-circle-outline"}
+                size={18}
+                color="#3478F6"
+              />
+              <Text style={styles.sortBtnText}>{sortLabel}</Text>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.sortBtn} onPress={toggleSortDir}>
-            <Ionicons
-              name={sortDir === "desc" ? "arrow-down-circle-outline" : "arrow-up-circle-outline"}
-              size={18}
-              color="#3478F6"
-            />
-            <Text style={styles.sortBtnText}>{sortLabel}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.dateRow}>
-          <TouchableOpacity style={styles.dateBtn} onPress={showPicker}>
-            <Ionicons name="calendar-clear-outline" size={18} color="#3478F6" />
-            <Text style={styles.dateBtnText}>
-              {selectedDate ? toLocalYmd(selectedDate) : "날짜 선택"}
-            </Text>
-          </TouchableOpacity>
-
-          {selectedDate && (
-            <TouchableOpacity style={styles.clearBtn} onPress={clearDate}>
-              <Ionicons name="close-circle" size={18} color="#999" />
+          <View style={styles.dateRow}>
+            <TouchableOpacity style={styles.dateBtn} onPress={showPicker}>
+              <Ionicons name="calendar-clear-outline" size={18} color="#3478F6" />
+              <Text style={styles.dateBtnText}>
+                {selectedDate ? toLocalYmd(selectedDate) : "날짜 선택"}
+              </Text>
             </TouchableOpacity>
-          )}
-        </View>
-      </View>
 
-      {/* 요약 */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: "#3478F6" }]}>12회</Text>
-          <Text style={styles.summaryLabel}>총 주행</Text>
+            {selectedDate && (
+              <TouchableOpacity style={styles.clearBtn} onPress={clearDate}>
+                <Ionicons name="close-circle" size={18} color="#999" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: "green" }]}>5.2시간</Text>
-          <Text style={styles.summaryLabel}>주행 시간</Text>
+
+        {/* 요약 */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: "#3478F6" }]}>12회</Text>
+            <Text style={styles.summaryLabel}>총 주행</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: "green" }]}>5.2시간</Text>
+            <Text style={styles.summaryLabel}>주행 시간</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: "red" }]}>16회</Text>
+            <Text style={styles.summaryLabel}>총 이벤트</Text>
+          </View>
         </View>
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: "red" }]}>16회</Text>
-          <Text style={styles.summaryLabel}>총 이벤트</Text>
-        </View>
-      </View>
 
-      {/* 리스트 */}
-      <FlatList
-        data={filteredData}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
-            선택한 조건에 해당하는 기록이 없습니다.
-          </Text>
-        }
-        contentContainerStyle={{ paddingBottom: 20 }}
-      />
-
-      {/* 날짜 모달 */}
-      <DateTimePickerModal
-        isVisible={isPickerVisible}
-        mode="date"
-        onConfirm={onConfirmDate}
-        onCancel={hidePicker}
-        locale="ko-KR"
-      />
-
-      {/* 상세 오버레이 (선택 시 표시) */}
-      {selectedId && (
-        <RecordDetails
-          id={selectedId}
-          onClose={() => setSelectedId(null)}
+        {/* 리스트 */}
+        <FlatList
+          data={filteredData}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
+              선택한 조건에 해당하는 기록이 없습니다.
+            </Text>
+          }
+          contentContainerStyle={{ paddingBottom: 80 }} // ★ 탭바에 안 가리도록 여유
         />
-      )}
+
+        {/* 날짜 모달 */}
+        <DateTimePickerModal
+          isVisible={isPickerVisible}
+          mode="date"
+          onConfirm={onConfirmDate}
+          onCancel={hidePicker}
+          locale="ko-KR"
+        />
+
+        {/* 상세 오버레이 */}
+        {selectedId && (
+          <RecordDetails
+            id={selectedId}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }

@@ -1,8 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
+import {
+  useNavigation,
+  useIsFocused,
+} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { PageHeader } from '../../HomeComponents/PageHeader';
@@ -79,7 +90,6 @@ const fetchWeeklyStats = async () => {
 
 /**
  * GET /api/home/recentRecord
- * 최근 주행 기록 조회 (페이지 로딩 시 콘솔에 전체 응답 찍기)
  */
 const fetchRecentRecord = async () => {
   try {
@@ -105,9 +115,7 @@ const fetchRecentRecord = async () => {
     }
 
     const json = await response.json();
-    // ★ 여기서 전체 응답 콘솔 출력
     console.log('📌 recentRecord 응답:', JSON.stringify(json, null, 2));
-    // json = { success, code, message, data: [ { drivingId, startYear, ... } ], timestamp }
     return json;
   } catch (error) {
     console.error('Error fetching recent record:', error);
@@ -120,16 +128,22 @@ const fetchRecentRecord = async () => {
 const WeeklyStats = () => {
   const [weeklyData, setWeeklyData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const isFocused = useIsFocused(); // ★ Home 탭에 포커스될 때마다 true
 
   useEffect(() => {
+    if (!isFocused) return;
+
+    setLoading(true);
     (async () => {
       const res = await fetchWeeklyStats();
       if (res?.success) {
         setWeeklyData(res.data);
+      } else {
+        setWeeklyData(null);
       }
       setLoading(false);
     })();
-  }, []);
+  }, [isFocused]);
 
   if (loading) {
     return (
@@ -207,17 +221,22 @@ const RecentRecords = () => {
   const navigation = useNavigation();
   const [recentList, setRecentList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const isFocused = useIsFocused(); // ★ Home 탭 포커스
 
   useEffect(() => {
-    // 페이지 로딩 시 최근 기록 API 호출 + 콘솔 로그
+    if (!isFocused) return;
+
+    setLoading(true);
     (async () => {
       const res = await fetchRecentRecord();
       if (res?.success && Array.isArray(res.data)) {
-        setRecentList(res.data); // 나중에 map 렌더링할 때 사용 가능
+        setRecentList(res.data);
+      } else {
+        setRecentList([]);
       }
       setLoading(false);
     })();
-  }, []);
+  }, [isFocused]);
 
   return (
     <View style={recordStyles.container}>
@@ -243,7 +262,7 @@ const RecentRecords = () => {
         </Text>
       )}
 
-      {/* 지금은 UI는 예전 더미 그대로 두고, 나중에 recentList 기반으로 바꾸면 됨 */}
+      {/* TODO: 나중에 recentList 기반으로 실제 시간/상태 뿌려주면 됨 */}
       {!loading &&
         ['오늘 오후 2:30', '오늘 오후 3:30'].map((time, index) => (
           <View key={index} style={recordStyles.recordItem}>
@@ -291,16 +310,21 @@ const recordStyles = StyleSheet.create({
   recordDetails: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
 });
 
+// ------------------- HomeScreen -------------------
+
 export default function HomeScreen() {
   return (
-    <SafeAreaView style={styles.container}>
-      <PageHeader />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <TitleBanner />
-        <QuickAccess />
-        <WeeklyStats />
-        <RecentRecords />
-      </ScrollView>
+    // bottom safe area 제거하고, 실제 배경은 안쪽 View에서 처리
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        <PageHeader />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <TitleBanner />
+          <QuickAccess />
+          <WeeklyStats />
+          <RecentRecords />
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -312,6 +336,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 20,
-    paddingBottom: 20,
+    paddingBottom: 80, // 탭바에 안 가리게 여유
   },
 });
