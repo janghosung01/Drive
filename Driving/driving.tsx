@@ -4,7 +4,8 @@ import { Camera, CameraView } from "expo-camera";
 import { Audio } from "expo-av";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
+// ★ [수정] CommonActions 임포트 추가
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useWebSocket } from "./context/WebSocketContext";
 import { fileUriToArrayBuffer, zipSingleFileIfAvailable } from "../utils/wsHelpers";
 
@@ -73,7 +74,7 @@ export default function Driving() {
     };
   }, [recording]);
 
-  // 4. WebSocket 메시지 리스너 (RecordID 획득 + ★ TTS 음성 피드백)
+  // 4. WebSocket 메시지 리스너 (RecordID 획득 + TTS 음성 피드백)
   useEffect(() => {
     const ws = wsRef.current;
     if (!ws) return;
@@ -88,14 +89,12 @@ export default function Driving() {
           currentRecordIdRef.current = msg.recordId;
         }
 
-        // (2) ★ AI 음성 피드백 처리 (TTS)
+        // (2) AI 음성 피드백 처리 (TTS)
         if (msg.type === 'FEEDBACK_VOICE' && msg.message) {
           console.log("🔊 [TTS] 음성 안내:", msg.message);
           
-          // 기존 음성 중단 (긴급 메시지 우선)
-          Speech.stop(); 
+          Speech.stop(); // 기존 음성 중단
 
-          // TTS 재생
           Speech.speak(msg.message, {
             language: "ko-KR",
             pitch: 1.0,
@@ -135,14 +134,14 @@ export default function Driving() {
         });
     });
 
-  // 5. 주행 종료 API 호출
+  // 5. 주행 종료 API 호출 및 네비게이션 리셋
   const finishDrivingSequence = async () => {
     console.log("[Finish] 주행 종료 요청");
     setStatusMessage("주행 기록 저장 중...");
     
     try {
       if (currentRecordIdRef.current) {
-        // 백엔드에 종료 요청 (영상 URL은 보내지 않음 -> 백엔드가 알아서 합침)
+        // 백엔드에 종료 요청
         const response = await fetch(`${API_URL}/api/driving/end`, {
             method: 'POST',
             headers: {
@@ -153,7 +152,7 @@ export default function Driving() {
                 recordId: currentRecordIdRef.current,
                 endTime: new Date().toISOString(),
                 finalScore: 100, // (예시) 점수
-                finalVideoKeyOrUrl: null // ★ 백엔드가 직접 병합하도록 null 전송
+                finalVideoKeyOrUrl: null // 백엔드가 직접 병합하도록 null 전송
             })
         });
         
@@ -168,7 +167,20 @@ export default function Driving() {
       console.error("[Finish] 종료 에러:", e);
     } finally {
         setStopping(false);
+
+        // ★ [수정] 네비게이션 리셋 로직 적용
+
+        // 1. 탭을 '기록실'로 이동
         navigation.getParent()?.navigate("기록실");
+
+        // 2. '주행' 탭의 스택을 'DrivingScreen(준비 화면)'으로 초기화
+        //    이렇게 하면 현재 Driving 컴포넌트가 Unmount 되어 타이머 등이 초기화됨
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'DrivingScreen' }], 
+          })
+        );
     }
   };
 
@@ -209,7 +221,7 @@ export default function Driving() {
              nextPromise = null;
         }
 
-        // (B) 실시간 전송 (영상 병합용 배열 저장 로직 삭제함)
+        // (B) 실시간 전송
         const path = await zipSingleFileIfAvailable(uri);
         const buf = await fileUriToArrayBuffer(path);
         sendBinary(buf);
