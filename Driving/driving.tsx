@@ -4,10 +4,12 @@ import { Camera, CameraView } from "expo-camera";
 import { Audio } from "expo-av";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-// ★ [수정] CommonActions 임포트 추가
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useWebSocket } from "./context/WebSocketContext";
 import { fileUriToArrayBuffer, zipSingleFileIfAvailable } from "../utils/wsHelpers";
+
+// ★ 화면 회전 제어 라이브러리
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 const HOST = "15.165.244.204:8080"; // 백엔드 주소
 const API_URL = `http://${HOST}`;
@@ -32,6 +34,47 @@ export default function Driving() {
 
   const [stopping, setStopping] = useState(false);
   const [statusMessage, setStatusMessage] = useState(""); 
+
+  // ----------------------------------------------------------------
+  // ★ [수정] 화면 가로 모드(반대 방향) 고정 & 탭바 숨기기
+  // ----------------------------------------------------------------
+  useEffect(() => {
+    const lockLandscapeAndHideTab = async () => {
+      try {
+        // 1. 탭바 숨기기 (부모 네비게이터인 Tab.Navigator에 옵션 설정)
+        navigation.getParent()?.setOptions({
+          tabBarStyle: { display: "none" }
+        });
+
+        // 2. 가로 모드 고정 (LANDSCAPE_LEFT: 윗부분이 왼쪽)
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_LEFT);
+      } catch (e) {
+        console.warn("화면 설정 실패:", e);
+      }
+    };
+
+    lockLandscapeAndHideTab();
+
+    // 화면을 벗어날 때(Unmount) 원상복구
+    return () => {
+      const restoreScreen = async () => {
+        try {
+          // 1. 세로 모드로 복귀
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          
+          // 2. 탭바 다시 보이기
+          navigation.getParent()?.setOptions({
+            tabBarStyle: undefined // 기본값으로 복원 (보임)
+          });
+        } catch (e) {
+          console.warn("화면 복구 실패:", e);
+        }
+      };
+      restoreScreen();
+    };
+  }, [navigation]);
+  // ----------------------------------------------------------------
+
 
   // 1. 토큰 로드
   useEffect(() => {
@@ -168,13 +211,8 @@ export default function Driving() {
     } finally {
         setStopping(false);
 
-        // ★ [수정] 네비게이션 리셋 로직 적용
-
-        // 1. 탭을 '기록실'로 이동
+        // 네비게이션 리셋 로직
         navigation.getParent()?.navigate("기록실");
-
-        // 2. '주행' 탭의 스택을 'DrivingScreen(준비 화면)'으로 초기화
-        //    이렇게 하면 현재 Driving 컴포넌트가 Unmount 되어 타이머 등이 초기화됨
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
