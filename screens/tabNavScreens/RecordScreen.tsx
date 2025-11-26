@@ -13,12 +13,12 @@ const SERVER_BASE = "http://15.165.244.204:8080";
 
 // --- 타입 정의 ---
 interface HistoryRecord {
-  id: number;         // drivingId
-  date: string;       // "2024-01-15 14:30"
-  duration: string;   // "45분"
-  distance: string;   // "0km"
-  events: number;     // 이벤트 수
-  status: string;     // "안전", "주의" 등
+  id: number;         
+  date: string;       
+  duration: string;   
+  distance: string;   
+  events: number;     
+  status: string;     
 }
 
 interface HistorySummary {
@@ -26,6 +26,16 @@ interface HistorySummary {
   totalDrivingTime: string;
   totalEventCount: number;
 }
+
+// ★ [추가] Mock Data 정의
+const MOCK_RECORD: HistoryRecord = {
+  id: 999999, // 가짜 ID
+  date: "2025-11-26 17:32",
+  duration: "26분",
+  distance: "0km", 
+  events: 3,
+  status: "안전", 
+};
 
 // --- 유틸 ---
 function toLocalYmd(d: Date) {
@@ -38,17 +48,12 @@ function toLocalYmd(d: Date) {
 export default function RecordScreen() {
   const isFocused = useIsFocused();
 
-  // --- 상태 관리 ---
-  // ★ [수정] 필터에서 'events' 제거 (recent: 최근순, time: 운전시간순)
   const [filter, setFilter] = useState<"recent" | "time">("recent");
-  
-  // 정렬방향: desc(내림차순-기본), asc(오름차순)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isPickerVisible, setPickerVisible] = useState(false);
 
-  // 데이터 목록 & 요약
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [summary, setSummary] = useState<HistorySummary>({
     totalDrivingCount: 0,
@@ -56,13 +61,11 @@ export default function RecordScreen() {
     totalEventCount: 0,
   });
 
-  // 페이징 관리
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isLastPage, setIsLastPage] = useState(false);
   const PAGE_SIZE = 10;
 
-  // 상세 모달용 ID
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // --- API 호출 함수 ---
@@ -78,18 +81,15 @@ export default function RecordScreen() {
         return;
       }
 
-      // 쿼리 파라미터 구성
       const params = new URLSearchParams();
-      params.append("sortBy", filter); // recent, time
-      params.append("sortDir", sortDir); // asc, desc
+      params.append("sortBy", filter);
+      params.append("sortDir", sortDir);
       params.append("page", pageToFetch.toString());
       params.append("size", PAGE_SIZE.toString());
       
       if (selectedDate) {
         params.append("date", toLocalYmd(selectedDate));
       }
-
-      // console.log(`[API] 기록 조회 요청: ${SERVER_BASE}/api/history/list?${params.toString()}`);
 
       const res = await fetch(`${SERVER_BASE}/api/history/list?${params.toString()}`, {
         method: "GET",
@@ -108,18 +108,21 @@ export default function RecordScreen() {
       const json = await res.json();
 
       if (json.success) {
-        const newRecords = json.data.records; // 리스트
-        const newSummary = json.data.summary; // 요약 정보
+        const newRecords = json.data.records; 
+        const newSummary = json.data.summary; 
 
         setSummary(newSummary);
 
         if (shouldRefresh) {
-          setRecords(newRecords);
+          // ★ [수정] 첫 로딩(새로고침) 시 Mock Data를 맨 앞에 추가
+          // 필터나 날짜 선택 시에도 항상 떠있길 원하면 이렇게,
+          // 아니라면 조건(filter==='recent' && !selectedDate 등)을 걸 수도 있음.
+          setRecords([MOCK_RECORD, ...newRecords]);
         } else {
+          // 더보기(스크롤) 시에는 뒤에 붙임
           setRecords((prev) => [...prev, ...newRecords]);
         }
 
-        // 다음 페이지 확인
         setIsLastPage(newRecords.length < PAGE_SIZE);
         setPage(pageToFetch);
       }
@@ -130,14 +133,12 @@ export default function RecordScreen() {
     }
   };
 
-  // --- Effect: 필터/정렬/날짜 변경 시 초기화 및 재조회 ---
   useEffect(() => {
     if (isFocused) {
       fetchHistory(0, true);
     }
   }, [filter, sortDir, selectedDate, isFocused]);
 
-  // --- 이벤트 핸들러 ---
   const onEndReached = () => {
     if (!loading && !isLastPage) {
       fetchHistory(page + 1);
@@ -153,17 +154,16 @@ export default function RecordScreen() {
     setPickerVisible(false);
   };
 
-  // --- ★ [수정] 정렬 버튼 텍스트 (이벤트 관련 제거) ---
   const sortLabel = useMemo(() => {
     if (filter === "recent") return sortDir === "desc" ? "최근 순" : "오래된 순";
     if (filter === "time") return sortDir === "desc" ? "시간 많은 순" : "시간 적은 순";
     return sortDir === "desc" ? "내림차순" : "오름차순";
   }, [filter, sortDir]);
 
-  // --- 렌더링 ---
   const renderItem = useCallback(({ item }: { item: HistoryRecord }) => (
     <TouchableOpacity
       activeOpacity={0.85}
+      // Mock Data 클릭 시에는 ID가 999999가 전달됨 -> 상세 화면에서 예외처리 필요할 수 있음
       onPress={() => setSelectedId(String(item.id))}
       style={styles.recordItem}
     >
@@ -193,11 +193,9 @@ export default function RecordScreen() {
       <View style={styles.container}>
         <PageHeaderD />
 
-        {/* 1. 툴바: 필터, 정렬, 날짜 */}
         <View style={styles.toolbar}>
           <View style={styles.rowBetween}>
             <View style={styles.filterContainer}>
-              {/* ★ [수정] events 제거하고 recent, time만 표시 */}
               {(["recent", "time"] as const).map((type) => (
                 <TouchableOpacity
                   key={type}
@@ -237,7 +235,6 @@ export default function RecordScreen() {
           </View>
         </View>
 
-        {/* 2. 요약 카드 */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryValue, { color: "#3478F6" }]}>{summary.totalDrivingCount}회</Text>
@@ -253,7 +250,6 @@ export default function RecordScreen() {
           </View>
         </View>
 
-        {/* 3. 리스트 */}
         <FlatList
           data={records}
           renderItem={renderItem}
@@ -273,7 +269,6 @@ export default function RecordScreen() {
           contentContainerStyle={{ paddingBottom: 20 }} 
         />
 
-        {/* 날짜 선택 모달 */}
         <DateTimePickerModal
           isVisible={isPickerVisible}
           mode="date"
@@ -282,7 +277,6 @@ export default function RecordScreen() {
           locale="ko-KR"
         />
 
-        {/* 상세 보기 오버레이 */}
         {selectedId && (
           <RecordDetails
             id={selectedId}
@@ -358,7 +352,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  summaryItem: { alignItems: 'center', flex: 1 }, // flex: 1 추가하여 균등 분배
+  summaryItem: { alignItems: 'center', flex: 1 }, 
   summaryValue: { fontSize: 18, fontWeight: "bold" },
   summaryLabel: { fontSize: 12, color: "#666", marginTop: 2 },
 
